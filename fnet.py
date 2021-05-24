@@ -40,6 +40,7 @@ class FNet(nn.Module):
         x = self.block(x).mean(dim=1)
         return self.clf(x)
 
+
 class VisionFNet(nn.Module):
     def __init__(self, patch_size=7, channel=1, dims=64, classes=10, p=0.0):
         super().__init__()
@@ -51,6 +52,7 @@ class VisionFNet(nn.Module):
 
     def forward(self, x):
         return self.fnet(self.embed(x))
+
 
 if __name__ == "__main__":
     transform = transforms.Compose([
