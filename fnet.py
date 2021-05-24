@@ -89,6 +89,6 @@ if __name__ == "__main__":
                 correct += pred.eq(tar.view_as(pred)).sum().item()
 
         s_epoch = f"[{epoch:2d} / {num_epochs}] "
-        s_loss = f"{loss_avg=:.12f} "
-        s_acc = f"acc: {correct / len(test_dl.dataset)}"
+        s_loss = f"tain {loss_avg=:.12f} "
+        s_acc = f"test acc: {correct / len(test_dl.dataset)}"
         print(s_epoch + s_loss + s_acc)
