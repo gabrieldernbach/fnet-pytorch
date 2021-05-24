@@ -7,40 +7,22 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 
-class FeedForward(nn.Module):
-    def __init__(self, dim, p):
-        super(FeedForward, self).__init__()
-        self.norm = nn.LayerNorm(dim)
+class FBlock(nn.Module):
+    def __init__(self, dims, p):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dims)
+        self.norm2 = nn.LayerNorm(dims)
         self.feedforward = nn.Sequential(
-            nn.Linear(dim, dim * 2),
+            nn.Linear(dims, dims * 2),
             nn.GELU(),
             nn.Dropout(p),
-            nn.Linear(dim * 2, dim),
+            nn.Linear(dims * 2, dims),
         )
 
     def forward(self, x):
-        return self.norm(self.feedforward(x) + x)
-
-
-class Fourier2D(nn.Module):
-    def __init__(self, dim):
-        super(Fourier2D, self).__init__()
-        self.norm = nn.LayerNorm(dim)
-
-    def forward(self, x):
-        return self.norm((fft(fft(x, dim=-1), dim=-2)).real + x)
-
-
-class FBlock(nn.Module):
-    def __init__(self, dim, p):
-        super().__init__()
-        self.block = nn.Sequential(
-            Fourier2D(dim),
-            FeedForward(dim, p),
-        )
-
-    def forward(self, x):
-        return self.block(x)
+        x = self.norm1((fft(fft(x, dim=-1), dim=-2)).real + x)
+        x = self.norm2(self.feedforward(x) + x)
+        return x
 
 
 class FNet(nn.Module):
@@ -58,12 +40,11 @@ class FNet(nn.Module):
         x = self.block(x).mean(dim=1)
         return self.clf(x)
 
-
 class VisionFNet(nn.Module):
-    def __init__(self, patch_size=7, dims=64, classes=10, p=0.2):
+    def __init__(self, patch_size=7, channel=1, dims=64, classes=10, p=0.0):
         super().__init__()
         self.embed = nn.Sequential(
-            nn.Conv2d(1, dims, patch_size, patch_size),
+            nn.Conv2d(channel, dims, patch_size, stride=patch_size),
             Rearrange('b c h w -> b (h w) c')
         )
         self.fnet = FNet(dims=dims, p=p, blocks=3, classes=classes)
@@ -72,16 +53,6 @@ class VisionFNet(nn.Module):
         return self.fnet(self.embed(x))
 
 if __name__ == "__main__":
-    fn = FBlock(128, 0.2)
-    X = torch.randn(4, 16, 128)
-    o = fn(X)
-    print(o.shape)
-
-    X = torch.randn(16, 1, 28, 28)
-    fn = VisionFNet(patch_size=7, dims=64, classes=10)
-    o = fn(X)
-    print(o.mean().mean(), o.var().mean())
-
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
@@ -92,8 +63,8 @@ if __name__ == "__main__":
     train_dl = DataLoader(train_ds, batch_size=64, shuffle=True)
     test_dl = DataLoader(test_ds, batch_size=64, shuffle=True)
 
-    model = VisionFNet(patch_size=7, dims=64, classes=10)
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
+    model = VisionFNet(patch_size=7, channel=1, dims=64, classes=10)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.01)
     criterion = nn.CrossEntropyLoss()
 
     num_epochs = 10
